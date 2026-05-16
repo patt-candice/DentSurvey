@@ -27,7 +27,7 @@
  * 1) Deploy Code.gs as Google Apps Script Web App
  * 2) Paste the /exec URL here
  **************************************************************/
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbz-VhvZ91Fu-h3NKs6bYA78qwhFUq31DF18RXV2GLcMesd62e8YBqpwCFUOtsE7AuD8/exec';
+const GAS_API_URL = 'PUT_YOUR_GAS_WEB_APP_URL_HERE';
 
 const AGE_GROUPS = [
   {id:'12', label:'12 ปี'}, {id:'15', label:'15 ปี'}, {id:'35_44', label:'35-44 ปี'}, {id:'60_85', label:'60-85 ปี'}
@@ -113,13 +113,35 @@ async function register(e){e.preventDefault(); const d=Object.fromEntries(new Fo
 function logout(show=true){state.token='';state.user=null;localStorage.removeItem('dental_token');localStorage.removeItem('dental_user'); if(show) toast('success','ออกจากระบบแล้ว'); renderAuth();}
 
 function pageDashboard(){return `<section class="grid lg:grid-cols-4 gap-4"><div class="card p-5"><p class="text-slate-500">บุคคลทั้งหมด</p><h2 id="kpiStudents" class="text-3xl font-bold text-cyan-800">-</h2></div><div class="card p-5"><p class="text-slate-500">แบบสัมภาษณ์</p><h2 id="kpiInterview" class="text-3xl font-bold text-emerald-700">-</h2></div><div class="card p-5"><p class="text-slate-500">แบบตรวจช่องปาก</p><h2 id="kpiExam" class="text-3xl font-bold text-indigo-700">-</h2></div><div class="card p-5"><p class="text-slate-500">Verified</p><h2 id="kpiVerified" class="text-3xl font-bold text-orange-600">-</h2></div></section><section class="grid lg:grid-cols-2 gap-4 mt-4"><div class="card p-5"><h3 class="font-bold text-cyan-800 mb-3">จำนวนตามกลุ่มวัย</h3><canvas id="ageChart"></canvas></div><div class="card p-5"><h3 class="font-bold text-cyan-800 mb-3">จำนวนตามอำเภอ</h3><canvas id="districtChart"></canvas></div></section><section class="card p-5 mt-4"><h3 class="font-bold text-cyan-800 mb-3">จำนวนแบบประเมินรายประเภท</h3><div id="formCounts" class="grid md:grid-cols-4 gap-3"></div></section>`;}
-async function loadDashboard(){try{const r=await api('getDashboard'); const d=r.dashboard; document.getElementById('kpiStudents').textContent=d.totalStudents; const iv=Object.keys(d.forms).filter(k=>k.includes('Interview')).reduce((s,k)=>s+d.forms[k],0); const ex=Object.keys(d.forms).filter(k=>k.includes('OralExam')).reduce((s,k)=>s+d.forms[k],0); document.getElementById('kpiInterview').textContent=iv; document.getElementById('kpiExam').textContent=ex; document.getElementById('kpiVerified').textContent=d.verified; drawChart('ageChart',Object.keys(d.byAge),Object.values(d.byAge),'bar'); drawChart('districtChart',Object.keys(d.byDistrict),Object.values(d.byDistrict),'bar'); document.getElementById('formCounts').innerHTML=Object.entries(d.forms).map(([k,v])=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="text-sm text-slate-500">${k}</div><div class="text-2xl font-bold text-cyan-800">${v}</div></div>`).join('');}catch(e){console.error(e);toast('error',e.message)}}
+async function loadDashboard(){
+  // ป้องกัน error กรณี API ตอบกลับช้าหรือผู้ใช้เปลี่ยนหน้าไปแล้ว ทำให้ element ของ Dashboard ไม่มีอยู่ใน DOM
+  if(state.page !== 'dashboard') return;
+  try{
+    const r=await api('getDashboard');
+    if(state.page !== 'dashboard') return;
+    const d=r.dashboard||{};
+    const forms=d.forms||{};
+    const byAge=d.byAge||{};
+    const byDistrict=d.byDistrict||{};
+    setText('kpiStudents', d.totalStudents||0);
+    const iv=Object.keys(forms).filter(k=>k.includes('Interview')).reduce((s,k)=>s+(Number(forms[k])||0),0);
+    const ex=Object.keys(forms).filter(k=>k.includes('OralExam')).reduce((s,k)=>s+(Number(forms[k])||0),0);
+    setText('kpiInterview',iv);
+    setText('kpiExam',ex);
+    setText('kpiVerified',d.verified||0);
+    drawChart('ageChart',Object.keys(byAge),Object.values(byAge),'bar');
+    drawChart('districtChart',Object.keys(byDistrict),Object.values(byDistrict),'bar');
+    setHtml('formCounts',Object.entries(forms).map(([k,v])=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="text-sm text-slate-500">${k}</div><div class="text-2xl font-bold text-cyan-800">${v}</div></div>`).join(''));
+  }catch(e){console.error(e);toast('error',e.message)}
+}
 function drawChart(id, labels, data, type){const el=document.getElementById(id); if(!el)return; new Chart(el,{type,data:{labels,datasets:[{label:'จำนวน',data}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});}
 
 function pageStudents(){return `<section class="card p-5"><div class="flex flex-col md:flex-row md:items-end gap-3 mb-4"><div class="flex-1"><label class="label">ค้นหา ชื่อ / Identification / โรงเรียน / พื้นที่</label><input id="studentQ" class="input" placeholder="พิมพ์คำค้น"></div><div><label class="label">กลุ่มวัย</label><select id="studentAge" class="input"><option value="">ทั้งหมด</option>${AGE_GROUPS.map(a=>`<option value="${a.id}">${a.label}</option>`).join('')}</select></div><button onclick="searchStudents()" class="btn btn-primary">ค้นหา</button><button onclick="openStudentForm()" class="btn btn-soft">+ เพิ่มบุคคล</button></div><div id="studentResults" class="table-wrap"></div></section>`;}
 async function searchStudents(){try{showLoading('กำลังค้นหา'); const r=await api('searchStudents',{q:val('studentQ'),age_group:val('studentAge')}); Swal.close(); renderStudentTable(r.rows||[]);}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
 function renderStudentTable(rows){document.getElementById('studentResults').innerHTML = `<table class="w-full text-left"><thead><tr>${['รหัส','ชื่อ','กลุ่มวัย','โรงเรียน/หน่วยบริการ','พื้นที่','จัดการ'].map(h=>`<th class="th">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td class="td">${html(r.identification_number||r.student_id)}</td><td class="td font-semibold">${html(r.full_name)}</td><td class="td">${html(r.age_group)}</td><td class="td">${html(r.school_name||r.service_unit)}</td><td class="td">${html([r.province,r.district,r.subdistrict].filter(Boolean).join(' / '))}</td><td class="td whitespace-nowrap"><button class="btn btn-soft" onclick='selectStudent(${JSON.stringify(r).replace(/'/g,"&#39;")})'>เลือก</button><button class="btn btn-gray" onclick='openStudentForm(${JSON.stringify(r).replace(/'/g,"&#39;")})'>แก้ไข</button></td></tr>`).join('')}</tbody></table>`}
 function val(id){return (document.getElementById(id)||{}).value||''}
+function setText(id,value){const el=document.getElementById(id); if(el) el.textContent=value;}
+function setHtml(id,value){const el=document.getElementById(id); if(el) el.innerHTML=value;}
 function studentFields(){return ['identification_number','prefix','first_name','last_name','nickname','sex','birth_date','age_year','age_month','age_group','religion','education_level','province','district','subdistrict','village','address_detail','school_name','class_level','room','student_no','service_unit','location_type','phone','guardian_name','guardian_phone','note'];}
 function formInput(name,value=''){ const opts=options[name]; if(opts) return `<select name="${name}" class="input"><option value="">--เลือก--</option>${opts.map(o=>`<option ${String(value)===String(o)?'selected':''} value="${html(o)}">${html(o)}</option>`).join('')}</select>`; const type=name.includes('date')?'date':(name.includes('age')||name.includes('weight')||name.includes('height')||name.includes('money')||name.includes('amount')?'number':'text'); return `<input class="input" name="${name}" type="${type}" value="${html(value)}">`; }
 function openStudentForm(row={}){Swal.fire({title: row.student_id?'แก้ไขข้อมูลบุคคล':'เพิ่มบุคคลใหม่',width:'900px',html:`<form id="studentForm" class="grid md:grid-cols-3 gap-3 text-left">${studentFields().map(f=>`<div><label class="label">${fieldLabels[f]||f}</label>${formInput(f,row[f]||'')}</div>`).join('')}</form>`,showCancelButton:true,confirmButtonText:'บันทึก',cancelButtonText:'ยกเลิก',preConfirm:()=>Object.fromEntries(new FormData(document.getElementById('studentForm')))}).then(async res=>{if(res.isConfirmed){try{const data=Object.assign({},row,res.value); showLoading('กำลังบันทึก'); const r=await api('saveStudent',{data:JSON.stringify(data)}); Swal.close(); if(r.duplicates&&r.duplicates.length) await Swal.fire('บันทึกแล้ว แต่พบข้อมูลคล้ายกัน',`พบ ${r.duplicates.length} รายการ ระบบอนุญาตให้บันทึกตามที่ยืนยัน`, 'warning'); else toast('success','บันทึกสำเร็จ'); searchStudents();}catch(e){Swal.fire('บันทึกไม่สำเร็จ',e.message,'error')}}})}
@@ -150,14 +172,15 @@ function renderReport(){ const rp=state.report; if(!rp)return; const rec=rp.reco
 function pageUsers(){return `<section class="card p-5"><h2 class="text-xl font-bold text-cyan-800 mb-3">จัดการผู้ใช้</h2><button onclick="loadUsers()" class="btn btn-primary mb-3">โหลดข้อมูล</button><div id="usersBox" class="table-wrap"></div></section>`}
 async function loadUsers(){try{const r=await api('listUsers'); document.getElementById('usersBox').innerHTML=`<table class="w-full text-left"><thead><tr>${['ชื่อ','email','role','พื้นที่','status','จัดการ'].map(h=>`<th class="th">${h}</th>`).join('')}</tr></thead><tbody>${r.rows.map(u=>`<tr><td class="td">${html(u.full_name)}</td><td class="td">${html(u.email)}</td><td class="td">${html(u.role)}</td><td class="td">${html([u.province,u.district,u.subdistrict].filter(Boolean).join('/'))}</td><td class="td">${html(u.status)}</td><td class="td"><button class="btn btn-soft" onclick="approveUser('${u.user_id}','APPROVED')">อนุมัติ</button><button class="btn btn-danger" onclick="approveUser('${u.user_id}','SUSPENDED')">ระงับ</button></td></tr>`).join('')}</tbody></table>`}catch(e){toast('error',e.message)}}
 async function approveUser(id,status){try{await api('updateUserStatus',{user_id:id,status}); toast('success','บันทึกสถานะแล้ว'); loadUsers();}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
-function pageAdmin(){return `<section class="card p-5"><div class="flex flex-wrap gap-2 mb-4"><button onclick="runSetup()" class="btn btn-primary">Run setupAll</button><button onclick="repairHeaders()" class="btn btn-soft">Repair Headers</button><button onclick="seedData()" class="btn btn-soft">Seed Sample Data</button><button onclick="clearCache()" class="btn btn-gray">Clear Cache</button><button onclick="loadAdminStatus()" class="btn btn-gray">Refresh</button></div><div id="adminBox" class="table-wrap"></div></section>`}
+function pageAdmin(){return `<section class="card p-5"><div class="flex flex-wrap gap-2 mb-4"><button onclick="runSetup()" class="btn btn-primary">Run setupAll</button><button onclick="repairHeaders()" class="btn btn-soft">Repair Headers</button><button onclick="applyTextFormat()" class="btn btn-soft">Fix Phone/Text Format</button><button onclick="seedData()" class="btn btn-soft">Seed Sample Data</button><button onclick="clearCache()" class="btn btn-gray">Clear Cache</button><button onclick="loadAdminStatus()" class="btn btn-gray">Refresh</button></div><p class="text-sm text-slate-500 mb-3">ปุ่ม Fix Phone/Text Format ใช้ตั้งค่าคอลัมน์เบอร์โทรศัพท์และ Identification number เป็นข้อความ เพื่อไม่ให้เลข 0 ข้างหน้าหาย</p><div id="adminBox" class="table-wrap"></div></section>`}
 async function loadAdminStatus(){try{const r=await api('getAdminStatus'); document.getElementById('adminBox').innerHTML=`<table class="w-full text-left"><thead><tr>${['Sheet','Exists','Records','Headers'].map(h=>`<th class="th">${h}</th>`).join('')}</tr></thead><tbody>${r.status.sheets.map(s=>`<tr><td class="td font-semibold">${s.sheet}</td><td class="td">${s.exists?'YES':'NO'}</td><td class="td">${s.records}</td><td class="td">${s.headers}</td></tr>`).join('')}</tbody></table>`}catch(e){toast('error',e.message)}}
 async function runSetup(){try{showLoading('กำลัง setup'); await api('setupAll'); Swal.fire('สำเร็จ','setupAll completed','success'); loadAdminStatus();}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
 async function repairHeaders(){try{await api('repairHeaders'); toast('success','ซ่อม Header แล้ว'); loadAdminStatus();}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
+async function applyTextFormat(){try{await api('applyTextFormat'); toast('success','ตั้งค่าคอลัมน์เบอร์โทร/รหัสเป็นข้อความแล้ว'); loadAdminStatus();}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
 async function seedData(){try{await api('seedSampleData',{force:'1'}); toast('success','เพิ่มข้อมูลตัวอย่างแล้ว'); loadAdminStatus();}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
 async function clearCache(){try{await api('clearCache'); toast('success','Clear cache แล้ว');}catch(e){Swal.fire('ผิดพลาด',e.message,'error')}}
 
-render(); if(state.token && state.user) setTimeout(()=>loadDashboard(),100);
+render(); if(state.token && state.user && state.page==='dashboard') setTimeout(()=>loadDashboard(),100);
 </script>
 </body>
 </html>
