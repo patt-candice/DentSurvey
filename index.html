@@ -46,6 +46,7 @@ const RECORD_STATUS = ['DRAFT','SUBMITTED','VERIFIED','RETURNED'];
 const PERMANENT_TEETH = ['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28','48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'];
 const PRIMARY_TEETH = ['55','54','53','52','51','61','62','63','64','65','85','84','83','82','81','71','72','73','74','75'];
 const GINGIVAL_TEETH = ['16','11','26','46','31','36'];
+const ADULT_GINGIVAL_SITES = ['17_16','11','26_27','47_46','31','36_37'];
 const POCKET_SITES = ['17_16','11','26_27','47_46','31','36_37'];
 const state = { token:localStorage.getItem('dental_token')||'', user:JSON.parse(localStorage.getItem('dental_user')||'null'), page:'dashboard', selectedStudent:null, history:[], records:[], chart:null, charts:{}, report:null, dashboardFilters:{province:'',district:'',subdistrict:'',school_name:'',class_level:'',service_unit:'',age_group:''}, filterOptions:null };
 
@@ -79,6 +80,7 @@ options.dental_fluorosis = ['0 Normal','1 Questionable','2 Very mild','3 Mild','
 const gingivalScoreOptions = ['0 Healthy / Absence of condition','1 Bleeding','2 Calculus','5 Calculus with bleeding','9 Not recorded'];
 const pocketScoreOptions = ['0 Absence of condition','1 Pocket 4-5 mm.','2 Pocket 6 mm. or more','9 Not recorded'];
 GINGIVAL_TEETH.forEach(t=>options['gingival_'+t]=gingivalScoreOptions);
+ADULT_GINGIVAL_SITES.forEach(t=>options['gingival_'+t]=gingivalScoreOptions);
 POCKET_SITES.forEach(t=>options['pocket_'+t]=pocketScoreOptions);
 ['prosthetic_status_upper','prosthetic_status_lower'].forEach(k=>options[k]=['0 No prosthesis','1 Bridge','2 More than one bridge','3 Partial denture','4 Both bridge(s) and partial denture(s)','5 Full removable denture','6 Coping with Complete denture','9 Not recorded']);
 ['prosthetic_need_upper','prosthetic_need_lower'].forEach(k=>options[k]=['0 No prosthesis needed','1 Need for one-unit prosthesis','2 Need for multi-unit prosthesis','3 Need for full prosthesis','4 Need to repair denture','9 Not recorded']);
@@ -272,11 +274,22 @@ function commonInterviewFields(age){
 function examFields(age){
   age = normalizeAgeGroup(age);
   const base=['round_id','exam_date','examiner','duplication','age','sex','religion','education','location_type'];
-  if(age==='12') return base.concat(['dental_fluorosis'], GINGIVAL_TEETH.map(t=>'gingival_'+t), ['other_conditions','record_status']);
-  if(age==='15') return base.concat(GINGIVAL_TEETH.map(t=>'gingival_'+t), ['other_conditions','record_status']);
-  const adult = base.concat(['occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear'],GINGIVAL_TEETH.map(t=>'gingival_'+t),POCKET_SITES.map(t=>'pocket_'+t),['prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left','other_conditions','record_status']);
-  if(age==='60_85') return base.concat(['capacity_status','oral_dryness_sign','cervical_tooth_wear'],GINGIVAL_TEETH.map(t=>'gingival_'+t),POCKET_SITES.map(t=>'pocket_'+t),['prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left','other_conditions','record_status']);
-  return adult;
+  const childGingival = GINGIVAL_TEETH.map(t=>'gingival_'+t);
+  const adultGingival = ADULT_GINGIVAL_SITES.map(t=>'gingival_'+t);
+  const pocket = POCKET_SITES.map(t=>'pocket_'+t);
+  const prosthetic = ['prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left'];
+
+  // Age 12: primary + permanent dentition, Crown/Treatment only, Dental fluorosis, Gingival, Other conditions.
+  if(age==='12') return base.concat(['dental_fluorosis'], childGingival, ['other_conditions','record_status']);
+
+  // Age 15: permanent dentition, Crown/Treatment only, Gingival, Other conditions.
+  if(age==='15') return base.concat(childGingival, ['other_conditions','record_status']);
+
+  // Age 60-85: Capacity + oral dryness, Crown/Root/Treatment, cervical wear, gingival + pocket, prosthetic, posterior pair.
+  if(age==='60_85') return base.concat(['capacity_status','oral_dryness_sign','cervical_tooth_wear'], adultGingival, pocket, prosthetic, ['other_conditions','record_status']);
+
+  // Age 35-44: Crown/Root/Treatment, occlusal/incisal/cervical wear, gingival + pocket, prosthetic, posterior pair.
+  return base.concat(['occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear'], adultGingival, pocket, prosthetic, ['other_conditions','record_status']);
 }
 
 
@@ -301,9 +314,29 @@ function groupInterviewFields(age, fields){
 }
 function sectionProgress(fields,data){const total=fields.length; const filled=fields.filter(f=>String(data[f]||'').trim()).length; return total?`${filled}/${total} รายการ`:'';}
 function renderFormSections(type,age,fields,data){
-  if(type==='ORAL_EXAM') return `<div class="grid md:grid-cols-3 gap-3">${fields.map(f=>`<div class="${colSpanField(f)}"><label class="label">${fieldLabels[f]||f}</label>${fieldControl(f,data[f]||'')}</div>`).join('')}</div>`;
+  if(type==='ORAL_EXAM') return renderExamGeneralSection(age, fields, data);
   return `<div class="space-y-4">${groupInterviewFields(age,fields).map(([key,fs],idx)=>`<div class="section-card"><div class="section-head flex items-center justify-between"><div><div class="section-title">${idx+1}. ${sectionTitles[key]||key}</div><div class="section-sub">${key==='consume'?'ลงข้อมูลพฤติกรรมกิน/ดื่มตามแบบกระดาษ':key==='service'?'เลือกได้มากกว่า 1 ข้อในรายการที่ระบุ':key==='disease'?'ลงข้อมูลทุกข้อ':key==='elderly'?'เฉพาะกลุ่มผู้สูงอายุ':''}</div></div><span class="text-xs rounded-full bg-white/80 px-3 py-1 text-purple-700">${sectionProgress(fs,data)}</span></div><div class="p-4 grid md:grid-cols-3 gap-3">${fs.map(f=>`<div class="${colSpanField(f)}"><label class="label">${fieldLabels[f]||f}</label>${fieldControl(f,data[f]||'')}</div>`).join('')}</div></div>`).join('')}</div>`;
 }
+
+function renderExamGeneralSection(age, fields, data){
+  age = normalizeAgeGroup(age);
+  const titleMap = {
+    '12':'แบบตรวจช่องปาก อายุ 12 ปี: ข้อมูลทั่วไป + Dentition + Dental fluorosis + Gingival',
+    '15':'แบบตรวจช่องปาก อายุ 15 ปี: ข้อมูลทั่วไป + Dentition + Gingival',
+    '35_44':'แบบตรวจช่องปาก อายุ 35-44 ปี: ข้อมูลทั่วไป + Dentition/Tooth wear + Gingival/Pocket + Prosthetic',
+    '60_85':'แบบตรวจช่องปาก อายุ 60-85 ปี: Capacity/Oral dryness + Dentition + Gingival/Pocket + Prosthetic'
+  };
+  return `<div class="section-card mb-4">
+    <div class="section-head flex items-center justify-between">
+      <div><div class="section-title">${titleMap[age]||'แบบตรวจช่องปาก'}</div><div class="section-sub">ส่วนหัวแบบประเมินตามแบบกระดาษ ระบบจะแสดงส่วน Dentition และคะแนนเฉพาะกลุ่มวัยด้านล่าง</div></div>
+      <span class="text-xs rounded-full bg-white/80 px-3 py-1 text-purple-700">${sectionProgress(fields,data)}</span>
+    </div>
+    <div class="p-4 grid md:grid-cols-3 gap-3">
+      ${fields.map(f=>`<div class="${colSpanField(f)}"><label class="label">${fieldLabels[f]||f}</label>${fieldControl(f,data[f]||'')}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
 const kpiIcons={kpiStudents:'👥',kpiInterview:'📝',kpiExam:'🦷',kpiTreatment:'🩺',kpiVerified:'✅'};
 function formatReportValue(k,v){ if(!v) return ''; if(/date|_at/.test(k)) return thaiDate(v); return String(v).replace(/\|/g, ', '); }
 function reportFieldGrid(fields,rec){return fields.filter(f=>rec[f]!==''&&rec[f]!=null).map(f=>`<div class="border-b border-slate-200 py-1"><b>${fieldLabels[f]||f}:</b> ${html(formatReportValue(f,rec[f]))}</div>`).join('')}
@@ -474,15 +507,34 @@ function scoreBox(title,names,labels,data,optionKeyPrefix){
 function toothChart(age,data={}){
   age = normalizeAgeGroup(age);
   const adult=['35_44','60_85'].includes(age);
-  const upper= age==='12'?['55','54','53','52','51','61','62','63','64','65','18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28']:['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28'];
-  const lower= age==='12'?['85','84','83','82','81','71','72','73','74','75','48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38']:['48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'];
-  const toothStatusDefs = `<div class="grid md:grid-cols-2 gap-3 text-xs text-slate-700 mt-3"><div class="rounded-xl bg-purple-50 p-3"><b>TOOTH STATUS</b><div>0 Sound | 1 Visible cavity extending into dentine | 2 Filled with caries | 3 Filled no caries/SSC | 4 Missing as a result of caries | 5 Missing other reason | 6 Fissure sealant | 7 Bridge abutment/special crown/veneer | 8 Unerupted tooth | T Trauma | 9 Not recorded</div><div class="mt-1">ฟันน้ำนม: A Sound, H White opacity/brown discoloration, N Enamel breakdown/dentine shadow, B Visible cavity, C Filled with caries, D Filled no caries/SSC, E Missing caries, F Sealant, G Bridge/special crown, T Trauma, 9 Not recorded</div></div><div class="rounded-xl bg-sky-50 p-3"><b>TREATMENT</b><div>0 None | P Prevention (Fluoride) | F Fissure sealant | R Preventive resin restoration | 1 One surface filling | 2 Two or more surface fillings | 3 Crown | 4 Pulp care/restoration | 5 Extraction | 6 Other care | 9 Not recorded</div></div></div>`;
-  const gingivalNames = age==='12'||age==='15'?['16','11','26','46','31','36']:['17_16','11','26_27','47_46','31','36_37'];
-  const gingivalLabels = age==='12'||age==='15'?['16','11','26','46','31','36']:['17/16','11','26/27','47/46','31','36/37'];
+  const is12 = age==='12';
+  const is15 = age==='15';
+  const upper= is12?['55','54','53','52','51','61','62','63','64','65','18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28']:['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28'];
+  const lower= is12?['85','84','83','82','81','71','72','73','74','75','48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38']:['48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'];
+  const paperHint = {
+    '12':'ตามแบบกระดาษ: ฟันน้ำนม + ฟันถาวร / Crown และ Treatment / Dental Fluorosis / Gingival bleeding scores',
+    '15':'ตามแบบกระดาษ: ฟันถาวร / Crown และ Treatment / Gingival bleeding scores',
+    '35_44':'ตามแบบกระดาษ: Crown, Root, Treatment / Occlusal-Incisal-Cervical tooth wear / Gingival + Pocket / Prosthetic / Posterior occlusal pair',
+    '60_85':'ตามแบบกระดาษ: Capacity, Oral dryness / Crown, Root, Treatment / Cervical tooth wear / Gingival + Pocket / Prosthetic / Posterior occlusal pair'
+  };
+  const toothStatusDefs = `<div class="grid md:grid-cols-2 gap-3 text-xs text-slate-700 mt-3">
+    <div class="rounded-xl bg-purple-50 p-3 border border-purple-100"><b>TOOTH STATUS</b>
+      <div class="mt-1"><b>Permanent:</b> 0 Sound | K White opacity/brown discoloration | P Enamel breakdown/dentine shadow | 1 Visible cavity | 2 Filled with caries | 3 Filled no caries/SSC | 4 Missing caries | 5 Missing other reason | 6 Fissure sealant | 7 Bridge/special crown/veneer | 8 Unerupted | T Trauma | 9 Not recorded</div>
+      <div class="mt-1"><b>Primary:</b> A Sound | H White opacity/brown discoloration | N Enamel breakdown/dentine shadow | B Visible cavity | C Filled with caries | D Filled no caries/SSC | E Missing caries | 9 Missing other reason | F Sealant | G Bridge/special crown/veneer | T Trauma | 9 Not recorded</div>
+    </div>
+    <div class="rounded-xl bg-sky-50 p-3 border border-sky-100"><b>TREATMENT</b>
+      <div class="mt-1">0 None | P Prevention (Fluoride) | F Fissure sealant | R Preventive resin restoration | 1 One surface filling | 2 Two or more surface fillings | 3 Crown | 4 Pulp care/restoration | 5 Extraction | 6 Need for other care | 9 Not recorded</div>
+    </div>
+  </div>`;
+  const gingivalNames = (is12||is15)?GINGIVAL_TEETH:ADULT_GINGIVAL_SITES;
+  const gingivalLabels = (is12||is15)?['16','11','26','46','31','36']:['17/16','11','26/27','47/46','31','36/37'];
   const pocketLabels=['17/16','11','26/27','47/46','31','36/37'];
-  const extra60 = age==='60_85'?`<div class="grid md:grid-cols-3 gap-3 mb-3"><div><label class="label">Capacity</label>${formInput('capacity_status',data.capacity_status||'')}</div><div><label class="label">Oral dryness sign</label>${formInput('oral_dryness_sign',data.oral_dryness_sign||'')}</div><div><label class="label">Cervical tooth wear จำนวนซี่</label>${formInput('cervical_tooth_wear',data.cervical_tooth_wear||'')}</div></div>`:'';
-  const extra35 = age==='35_44'?`<div class="grid md:grid-cols-3 gap-3 mt-3"><div><label class="label">Occlusal tooth wear จำนวนซี่</label>${formInput('occlusal_tooth_wear',data.occlusal_tooth_wear||'')}</div><div><label class="label">Incisal tooth wear จำนวนซี่</label>${formInput('incisal_tooth_wear',data.incisal_tooth_wear||'')}</div><div><label class="label">Cervical tooth wear จำนวนซี่</label>${formInput('cervical_tooth_wear',data.cervical_tooth_wear||'')}</div></div>`:'';
-  return `<div class="mt-5 rounded-2xl border border-purple-200 bg-white overflow-hidden"><div class="p-4 border-b bg-purple-50"><h3 class="font-bold text-purple-900">DENTITION STATUS AND TREATMENT NEED</h3><p class="text-sm text-slate-600">ลงรหัสในช่อง Crown / Root / Treatment ตามตำแหน่งฟัน ให้เหมือนแบบกระดาษ</p></div><div class="p-4">${extra60}<div class="space-y-4">${dentitionBand(upper,adult,data)}${dentitionBand(lower,adult,data)}</div>${toothStatusDefs}${extra35}<div class="grid md:grid-cols-2 gap-3 mt-4">${age==='12'?`<div class="border rounded-2xl p-3 bg-white"><h4 class="font-bold text-purple-800 mb-2">DENTAL FLUOROSIS</h4>${formInput('dental_fluorosis',data.dental_fluorosis||'')}</div>`:''}${scoreBox('GINGIVAL BLEEDING SCORES (MODIFIED)',gingivalNames,gingivalLabels,data,'gingival_')}${adult?scoreBox('POCKET SCORES (MODIFIED)',POCKET_SITES,pocketLabels,data,'pocket_'):''}</div>${adult?`<div class="grid md:grid-cols-3 gap-3 mt-4"><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">PROSTHETIC STATUS</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Upper</label>${formInput('prosthetic_status_upper',data.prosthetic_status_upper||'')}</div><div><label class="label">Lower</label>${formInput('prosthetic_status_lower',data.prosthetic_status_lower||'')}</div></div></div><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">PROSTHETIC NEED</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Upper</label>${formInput('prosthetic_need_upper',data.prosthetic_need_upper||'')}</div><div><label class="label">Lower</label>${formInput('prosthetic_need_lower',data.prosthetic_need_lower||'')}</div></div></div><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">POSTERIOR OCCLUSAL PAIR</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Right</label>${formInput('posterior_occlusal_pair_right',data.posterior_occlusal_pair_right||'')}</div><div><label class="label">Left</label>${formInput('posterior_occlusal_pair_left',data.posterior_occlusal_pair_left||'')}</div></div></div></div>`:''}</div></div>`;
+  const top60 = age==='60_85'?`<div class="section-card mb-4"><div class="section-head"><div class="section-title">Capacity และ ORAL DRYNESS CONDITION</div><div class="section-sub">เฉพาะกลุ่ม 60-85 ปีตามแบบกระดาษ</div></div><div class="p-4 grid md:grid-cols-3 gap-3"><div><label class="label">Capacity</label>${formInput('capacity_status',data.capacity_status||'')}</div><div><label class="label">Mouth mirror sticks to buccal mucosa or tongue</label>${formInput('oral_dryness_sign',data.oral_dryness_sign||'')}</div></div></div>`:'';
+  const wear35 = age==='35_44'?`<div class="section-card mt-4"><div class="section-head"><div class="section-title">TOOTH WEAR</div><div class="section-sub">บันทึกจำนวนซี่ที่มี tooth wear ตามแบบ 35-44 ปี</div></div><div class="p-4 grid md:grid-cols-3 gap-3"><div><label class="label">Occlusal tooth wear</label>${formInput('occlusal_tooth_wear',data.occlusal_tooth_wear||'')}</div><div><label class="label">Incisal tooth wear</label>${formInput('incisal_tooth_wear',data.incisal_tooth_wear||'')}</div><div><label class="label">Cervical tooth wear</label>${formInput('cervical_tooth_wear',data.cervical_tooth_wear||'')}</div></div></div>`:'';
+  const wear60 = age==='60_85'?`<div class="section-card mt-4"><div class="section-head"><div class="section-title">CERVICAL TOOTH WEAR</div><div class="section-sub">บันทึกจำนวนซี่ที่มี cervical tooth wear ตามแบบผู้สูงอายุ</div></div><div class="p-4 max-w-sm"><label class="label">Cervical tooth wear</label>${formInput('cervical_tooth_wear',data.cervical_tooth_wear||'')}</div></div>`:'';
+  const fluorosis = age==='12'?`<div class="border rounded-2xl p-3 bg-white"><h4 class="font-bold text-purple-800 mb-2">DENTAL FLUOROSIS</h4><p class="text-xs text-slate-500 mb-2">0 Normal, 1 Questionable, 2 Very mild, 3 Mild, 4 Moderate, 5 Severe, 9 Not recorded</p>${formInput('dental_fluorosis',data.dental_fluorosis||'')}</div>`:'';
+  const prosthetic = adult?`<div class="section-card mt-4"><div class="section-head"><div class="section-title">PROSTHETIC STATUS / PROSTHETIC NEED / POSTERIOR OCCLUSAL PAIR</div><div class="section-sub">เฉพาะกลุ่มผู้ใหญ่และผู้สูงอายุตามแบบกระดาษ</div></div><div class="p-4 grid md:grid-cols-3 gap-3"><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">PROSTHETIC STATUS</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Upper</label>${formInput('prosthetic_status_upper',data.prosthetic_status_upper||'')}</div><div><label class="label">Lower</label>${formInput('prosthetic_status_lower',data.prosthetic_status_lower||'')}</div></div><p class="text-xs text-slate-500 mt-2">0 No prosthesis, 1 Bridge, 2 More than one bridge, 3 Partial denture, 4 Both, 5 Full removable denture, 6 Coping with complete denture, 9 Not recorded</p></div><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">PROSTHETIC NEED</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Upper</label>${formInput('prosthetic_need_upper',data.prosthetic_need_upper||'')}</div><div><label class="label">Lower</label>${formInput('prosthetic_need_lower',data.prosthetic_need_lower||'')}</div></div><p class="text-xs text-slate-500 mt-2">0 No need, 1 One-unit, 2 Multi-unit, 3 Full prosthesis, 4 Repair denture, 9 Not recorded</p></div><div class="border rounded-2xl p-3"><h4 class="font-bold text-purple-800">POSTERIOR OCCLUSAL PAIR</h4><div class="grid grid-cols-2 gap-2 mt-2"><div><label class="label">Right</label>${formInput('posterior_occlusal_pair_right',data.posterior_occlusal_pair_right||'')}</div><div><label class="label">Left</label>${formInput('posterior_occlusal_pair_left',data.posterior_occlusal_pair_left||'')}</div></div></div></div></div>`:'';
+  return `<div class="mt-5 rounded-2xl border border-purple-200 bg-white overflow-hidden"><div class="p-4 border-b bg-purple-50"><h3 class="font-bold text-purple-900">DENTITION STATUS AND TREATMENT NEED</h3><p class="text-sm text-slate-600">${paperHint[age]||''}</p></div><div class="p-4">${top60}<div class="space-y-4">${dentitionBand(upper,adult,data)}${dentitionBand(lower,adult,data)}</div>${toothStatusDefs}${wear35}${wear60}<div class="grid md:grid-cols-2 gap-3 mt-4">${fluorosis}${scoreBox('GINGIVAL BLEEDING SCORES (MODIFIED)',gingivalNames,gingivalLabels,data,'gingival_')}${adult?scoreBox('POCKET SCORES (MODIFIED)',POCKET_SITES,pocketLabels,data,'pocket_'):''}</div>${prosthetic}</div></div>`;
 }
 function saveDraft(type,age){ const s=state.selectedStudent; if(!s)return; const data=Object.fromEntries(new FormData(document.getElementById('assessmentForm'))); localStorage.setItem(draftKey(type,age,s.student_id), JSON.stringify(data)); }
 function clearDraft(type,age){localStorage.removeItem(draftKey(type,age,state.selectedStudent.student_id)); toast('success','ลบแบบร่างแล้ว');}
