@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ระบบสำรวจสุขภาพช่องปาก 4 กลุ่มวัย</title>
+  <!-- Patched: full paper-like options for interviews/exams, preserving purple dashboard/features -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -74,14 +75,123 @@ POCKET_SITES.forEach(t=>options['pocket_'+t]=pocketScoreOptions);
 ['prosthetic_need_upper','prosthetic_need_lower'].forEach(k=>options[k]=['0 No prosthesis needed','1 Need for one-unit prosthesis','2 Need for multi-unit prosthesis','3 Need for full prosthesis','4 Need to repair denture','9 Not recorded']);
 options.posterior_occlusal_pair_right = options.posterior_occlusal_pair_left = ['0 ไม่มี','1 มี'];
 
+// ===== Enhanced interview/oral-exam options mapped to paper forms =====
+// ใช้ตัวเลข + ข้อความเท่านั้น ไม่ใส่สัญลักษณ์สี่เหลี่ยมจากแบบกระดาษ
+Object.assign(fieldLabels, {
+  brush_morning:'5.1 แปรงฟันตอนเช้า',
+  brush_lunch:'5.2 แปรงฟันหลังอาหารกลางวัน',
+  brush_bedtime:'5.3 แปรงฟันก่อนนอน',
+  eat_after_bedtime_brush:'แปรงฟันก่อนนอนแล้วกิน/ดื่มต่อหรือไม่',
+  brushing_duration:'ระยะเวลาแปรงฟันแต่ละครั้ง',
+  use_toothpaste:'ใช้ยาสีฟันเมื่อแปรงฟันที่บ้านหรือไม่',
+  toothpaste_brand_code:'ยี่ห้อยาสีฟันที่ใช้บ่อยที่สุด',
+  money_to_school_per_day:'เงินที่ได้มาโรงเรียนต่อวัน (บาท)',
+  snack_drink_money_per_day:'เงินซื้อขนมและเครื่องดื่ม ไม่รวมน้ำเปล่า (บาท/วัน)',
+  sweet_drink_frequency:'ดื่มเครื่องดื่มรสหวานระหว่างมื้ออาหาร',
+  snack_frequency:'กินขนมถุงกรุบกรอบ/เบเกอรี่ระหว่างมื้ออาหาร',
+  candy_frequency:'กินลูกอม',
+  candy_times_per_day:'ถ้ากินทุกวัน จำนวนครั้ง/วัน',
+  candy_pieces_per_time:'ถ้ากินทุกวัน ครั้งละกี่เม็ด',
+  add_sugar_frequency:'เติมน้ำตาลในอาหารสำเร็จรูป/อาหารจานเดียว',
+  dental_check_12m:'ใน 12 เดือนที่ผ่านมา เคยได้รับการตรวจฟันหรือไม่',
+  dental_treatment_12m:'ใน 12 เดือนที่ผ่านมา เคยทำฟันหรือไม่',
+  dental_treatment_places:'สถานที่ไปรับบริการทำฟัน (ตอบได้มากกว่า 1 ข้อ)',
+  oral_health_info_sources:'แหล่งความรู้สุขภาพช่องปากที่ต้องการ (ตอบได้มากกว่า 1 ข้อ)',
+  additional_cleaning_methods:'วิธีทำความสะอาดฟันเพิ่มเติมนอกจากแปรงฟัน (ตอบได้มากกว่า 1 ข้อ)',
+  health_welfare_rights:'สิทธิรักษาพยาบาล/สวัสดิการสุขภาพ (ตอบได้มากกว่า 1 ข้อ หรือพิมพ์เพิ่ม)',
+  knowledge_need_sources:'แหล่งความรู้ที่ต้องการ (ตอบได้มากกว่า 1 ข้อ)',
+  knowledge_need_topics:'เรื่องความรู้สุขภาพช่องปากที่ต้องการ (ตอบได้มากกว่า 1 ข้อ)',
+  oral_health_knowledge_sources_12m:'แหล่งความรู้สุขภาพช่องปากใน 12 เดือนที่ผ่านมา (ตอบได้มากกว่า 1 ข้อ)',
+  oral_health_problem_types:'ชนิดปัญหาหรือผลกระทบช่องปาก (ตอบได้มากกว่า 1 ข้อ)',
+  no_visit_reasons:'เหตุผลที่ไม่ไปพบทันตบุคลากร (ตอบได้มากกว่า 1 ข้อ)',
+  visit_reasons:'เหตุผลที่ไปพบทันตบุคลากร',
+  visit_places:'สถานที่ที่ไปพบทันตบุคลากร (ตอบได้มากกว่า 1 ข้อ)',
+  not_use_right_reasons:'เหตุผลที่ไม่ใช้สิทธิสวัสดิการ (ตอบได้มากกว่า 1 ข้อ)',
+  oral_cleaning_no_teeth_method:'กรณีไม่มีฟันถาวร: วิธีทำความสะอาดช่องปาก',
+  denture_cleaning_method:'กรณีใส่ฟันเทียม: วิธีทำความสะอาดฟันเทียม',
+  remove_denture_before_sleep:'ถอดฟันเทียมก่อนนอนทุกวันหรือไม่',
+  chewing_hard_food_problem:'มีปัญหาเคี้ยวอาหารแข็งหรือไม่',
+  need_water_to_swallow:'กินอาหารแล้วต้องดื่มน้ำตามเพื่อช่วยกลืนบ่อยครั้งหรือไม่',
+  dry_tongue_palate:'มีลิ้นแห้งติดเพดานปากบ่อยครั้งจนรู้สึกได้หรือไม่',
+  dry_mouth_feeling:'รู้สึกว่าช่องปากแห้งหรือไม่',
+  coughing_choking_when_eating:'เมื่อกินอาหาร/ดื่มน้ำ มักไอหรือสำลักหรือไม่'
+});
+options.brush_morning = options.brush_lunch = options.brush_bedtime = ['0 ไม่เคยแปรงเลย','1 แปรงเป็นบางวัน','2 แปรงทุกวัน'];
+options.brushing_duration = ['1 น้อยกว่า 2 นาที','2 ตั้งแต่ 2 นาทีขึ้นไป','3 ไม่ทราบ/ไม่แน่นอน'];
+options.use_toothpaste = ['0 ไม่ใช้ยาสีฟัน','1 ใช้ยาสีฟัน'];
+options.toothbrush_bristle_type = ['1 นุ่มเท่ากัน','2 นุ่มกว่าที่แจก','3 แข็งกว่าที่แจก'];
+options.toothbrush_change_frequency = ['1 ทุก 1-2 เดือน','2 ทุก 3-5 เดือน','3 ทุก 6 เดือน','4 เมื่อขนแปรงบานหรือสกปรก','5 อื่นๆ'];
+options.dental_check_12m = ['0 ไม่เคย','1 เคย ครูตรวจให้','2 เคย หมอฟันตรวจให้','3 เคย ทั้งครูและหมอฟันตรวจให้'];
+options.dental_treatment_12m = ['0 ไม่เคย','1 เคย'];
+options.toothache_12m = ['0 ไม่เคย','1 เคย'];
+options.absent_dental_visit_12m = ['0 ไม่เคย','1 เคย'];
+options.smoking_status = ['0 ไม่เคยสูบ','1 เคยสูบ/เคยลองสูบ ปัจจุบันเลิกแล้ว','2 ยังสูบจนถึงปัจจุบัน'];
+options.alcohol_status = ['0 ไม่ดื่ม','1 ดื่มเฉพาะเทศกาลหรือวันพิเศษ','2 ดื่มเป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้ง'];
+options.oral_health_satisfaction = ['0 ไม่พอใจ','1 พอใจปานกลาง','2 พอใจมาก'];
+options.oral_health_problem_12m = ['0 ไม่มี','1 มี'];
+options.occupation = ['01 ข้าราชการ/พนักงานราชการ/ลูกจ้างของรัฐ/พนักงานรัฐวิสาหกิจ','02 พนักงาน/ลูกจ้างเอกชน','03 ค้าขาย/ประกอบธุรกิจส่วนตัว','04 เกษตรกร','05 รับจ้างทั่วไป','06 นักเรียน/นิสิต/นักศึกษา','07 ขับรถรับจ้างสาธารณะ','08 แม่บ้าน/พ่อบ้าน/ข้าราชการบำนาญ','09 ว่างงาน/ไม่มีงานทำ','10 อื่นๆ'];
+options.income_group = ['0 ไม่มีรายได้','1 รายได้ไม่เกิน 5,000 บาท','2 รายได้ 5,001-15,000 บาท','3 รายได้ 15,001-30,000 บาท','4 รายได้ 30,001-50,000 บาท','5 รายได้ตั้งแต่ 50,001 บาทขึ้นไป'];
+options.disease_diabetes = options.disease_hypertension = options.disease_heart = options.disease_depression = options.disease_kidney = options.disease_arthritis = options.disease_stroke = options.disease_asthma = options.disease_cancer = ['0 ไม่มี','1 มี','2 ไม่เคยตรวจ'];
+options.dental_visit_12m = ['0 จำไม่ได้ (ไม่ต้องถามต่อ)','1 ไม่เคยไป','2 เคยไป'];
+options.used_health_right_last_visit = ['0 ไม่ใช้','1 ใช้'];
+options.extra_payment_last_visit = ['0 ไม่มี','1 มี'];
+options.health_welfare_rights = ['1 UC/สิทธิบัตรทอง','2 ประกันสังคม','3 ราชการ/ข้าราชการบำนาญ','4 ประกันสุขภาพ(เอกชน)','5 สวัสดิการของหน่วยงาน','6 อื่นๆ','7 ไม่ทราบ','จ่ายเอง'];
+options.oral_cleaning_no_teeth_method = ['0 ไม่ได้ทำความสะอาด','1 เช็ดทำความสะอาด','2 ใช้น้ำยาบ้วนปาก','3 อื่นๆ'];
+options.denture_cleaning_method = ['0 ไม่ทำอะไร','1 ล้างน้ำเปล่าอย่างเดียว','2 ใช้แปรง','3 ล้างน้ำยาสำหรับฟันเทียม','4 อื่นๆ'];
+options.remove_denture_before_sleep = ['0 ไม่ถอด','1 ถอดบางวัน','2 ถอดทุกวัน'];
+options.chewing_hard_food_problem = options.need_water_to_swallow = options.dry_tongue_palate = options.dry_mouth_feeling = options.coughing_choking_when_eating = ['0 ไม่มี','1 มี'];
+options.other_tobacco_use = ['0 ไม่ใช้','1 บุหรี่ไฟฟ้า','2 อื่นๆ'];
+options.betel_chewing_status = ['0 ไม่เคย','1 เคยแต่ปัจจุบันเลิกแล้ว','2 นานๆ ครั้ง','3 เป็นประจำ อย่างน้อยสัปดาห์ละ 1 ครั้ง'];
+
+const multiFieldOptions = {
+  additional_cleaning_methods:['0 ไม่ได้ทำ','1 ใช้ไหมขัดฟัน','2 ใช้แปรงซอกฟัน','3 ใช้น้ำยาบ้วนปาก','4 ใช้ไม้จิ้มฟัน','5 อื่นๆ'],
+  dental_treatment_places:['1 หมอฟันมาที่โรงเรียน','2 สถานีอนามัย/รพ.สต.','3 โรงพยาบาลรัฐ/ศูนย์บริการสาธารณสุข','4 โรงพยาบาลเอกชน/คลินิก'],
+  oral_health_info_sources:['01 สื่อออนไลน์ เช่น เว็บไซต์/เฟซบุ๊ก/ไลน์/TIKTOK/YouTube','02 วิทยุ/วิทยุชุมชน','03 เสียงตามสาย/หอกระจายข่าว','04 โปสเตอร์/แผ่นพับ','05 โทรทัศน์','06 พ่อแม่/ญาติพี่น้อง','07 ครู','08 หมอ/พยาบาล/เจ้าหน้าที่สาธารณสุข','09 อสม.','10 เพื่อน','11 หนังสือ/วารสาร/หนังสือพิมพ์','12 อื่นๆ'],
+  knowledge_need_sources:['01 สื่อออนไลน์ เช่น เว็บไซต์/เฟซบุ๊ก/ไลน์/TIKTOK/YouTube','02 วิทยุ/วิทยุชุมชน','03 เสียงตามสาย/หอกระจายข่าว','04 โปสเตอร์/แผ่นพับ','05 โทรทัศน์','06 พ่อแม่/ญาติพี่น้อง','07 ครู','08 หมอ/พยาบาล/เจ้าหน้าที่สาธารณสุข','09 อสม.','10 เพื่อน','11 หนังสือ/วารสาร/หนังสือพิมพ์','12 อื่นๆ'],
+  oral_health_knowledge_sources_12m:['01 สื่อออนไลน์ เช่น เว็บไซต์/เฟซบุ๊ก/ไลน์/TIKTOK/YouTube','02 วิทยุ/วิทยุชุมชน','03 เสียงตามสาย/หอกระจายข่าว','04 โปสเตอร์/แผ่นพับ','05 โทรทัศน์','06 พ่อแม่/ญาติพี่น้อง','07 ครู','08 หมอ/พยาบาล/เจ้าหน้าที่สาธารณสุข','09 อสม.','10 เพื่อน','11 หนังสือ/วารสาร/หนังสือพิมพ์','12 อื่นๆ','00 ไม่เคยได้รับ'],
+  knowledge_need_topics:['1 วิธีทำความสะอาดช่องปาก','2 สิทธิและสวัสดิการการทำฟัน','3 โรคในช่องปาก','4 การจัดฟัน','5 ผลิตภัณฑ์ทำความสะอาดช่องปาก','6 การฟอกสีฟัน','7 การบริโภคอาหารที่ส่งผลต่อสุขภาพช่องปาก','8 อื่นๆ'],
+  oral_health_problem_types:['1 อาหารติดตามซอกฟัน','2 ปวดฟัน','3 เจ็บแผลในปาก','4 กินอาหารได้ช้าๆ','5 เคี้ยวอาหารลำบาก','6 กลิ่นปาก','7 นอนไม่หลับเนื่องจากปัญหาในช่องปาก','8 อื่นๆ'],
+  health_welfare_rights: options.health_welfare_rights,
+  no_visit_reasons:['1 ไม่มีเวลา','2 ไม่มีคนพาไป','3 ไม่มีอาการผิดปกติ','4 รอนาน','5 กลัวการทำฟัน','6 ค่ารักษาแพง','7 การระบาดของโรคโควิด-19','8 อื่นๆ'],
+  visit_reasons:['1 ต้องการตรวจเช็คสุขภาพช่องปาก','2 รู้สึกมีความผิดปกติในช่องปาก','3 ไปตามหมอนัด','4 อื่นๆ'],
+  visit_places:['1 สถานีอนามัย/รพ.สต./ศูนย์สุขภาพชุมชน','2 โรงพยาบาลชุมชน/ศูนย์บริการสาธารณสุข','3 โรงพยาบาลศูนย์/โรงพยาบาลทั่วไป/โรงพยาบาลรัฐอื่น','4 โรงพยาบาลเอกชน/คลินิกทันตกรรมเอกชน','5 หน่วยเคลื่อนที่มีทันตแพทย์/ทันตบุคลากร','51 หน่วยเคลื่อนที่ภาครัฐ','52 หน่วยเคลื่อนที่ภาคเอกชน','6 อื่นๆ'],
+  not_use_right_reasons:['1 ไม่มีสิทธิ','2 คิวยาว','3 รอนาน','4 สิทธิที่มีไม่ครอบคลุมการรักษาที่ได้รับ','5 อื่นๆ']
+};
+
+
 function commonInterviewFields(age){
   const base = ['round_id','interview_date','interviewer','weight','height','weight_height_source','religion'];
   const oralCare = ['brush_morning','brush_lunch','brush_bedtime','eat_after_bedtime_brush','brushing_duration','use_toothpaste','toothpaste_brand_code','toothpaste_brand_other'];
-  if(age==='12') return base.concat(oralCare,['money_to_school_per_day','snack_drink_money_per_day','sweet_drink_frequency','snack_frequency','candy_frequency','candy_times_per_day','candy_pieces_per_time','add_sugar_frequency','smoking_status','smoking_start_age','toothache_12m','absent_days_toothache','absent_dental_visit_12m','absent_days_dental_visit','dental_check_12m','dental_treatment_12m','dental_treatment_places','oral_health_info_sources','record_status']);
-  if(age==='15') return base.concat(oralCare,['toothbrush_bristle_type','additional_cleaning_methods','sweet_drink_frequency','snack_frequency','smoking_status','smoking_years','smoking_months','cigarettes_per_day','quit_smoking_years','quit_smoking_months','other_tobacco_use','alcohol_status','oral_health_satisfaction','oral_health_problem_12m','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','record_status']);
-  const adult = base.concat(['marital_status','occupation','income_group','education_level','disease_diabetes','disease_hypertension','disease_heart','disease_depression','disease_kidney','disease_arthritis','disease_stroke','disease_asthma','disease_cancer','disease_cancer_site','disease_other'],oralCare,['toothbrush_bristle_type','toothbrush_change_frequency','additional_cleaning_methods','denture_cleaning_method','remove_denture_before_sleep','sweet_drink_frequency','sweet_level_order','add_sugar_frequency','smoking_status','smoking_years','smoking_months','cigarettes_per_day','quit_smoking_years','quit_smoking_months','other_tobacco_use','betel_chewing_status','alcohol_status','oral_health_satisfaction','oral_health_problem_12m','oral_health_problem_types','health_welfare_rights','oral_health_knowledge_sources_12m','dental_visit_12m','no_visit_reasons','dental_visit_times','visit_reasons','visit_places','used_health_right_last_visit','not_use_right_reasons','extra_payment_last_visit','extra_payment_amount']);
-  if(age==='60_85') return adult.concat(['capacity_status','oral_cleaning_no_teeth_method','chewing_hard_food_problem','need_water_to_swallow','dry_tongue_palate','dry_mouth_feeling','coughing_choking_when_eating','record_status']);
-  return adult.concat(['record_status']);
+  if(age==='12') return base.concat(oralCare,[
+    'money_to_school_per_day','snack_drink_money_per_day',
+    'sweet_drink_frequency','snack_frequency','candy_frequency','candy_times_per_day','candy_pieces_per_time','add_sugar_frequency',
+    'smoking_status','smoking_start_age',
+    'toothache_12m','absent_days_toothache','absent_dental_visit_12m','absent_days_dental_visit',
+    'dental_check_12m','dental_treatment_12m','dental_treatment_places','oral_health_info_sources','record_status'
+  ]);
+  if(age==='15') return base.concat(oralCare,[
+    'toothbrush_bristle_type','additional_cleaning_methods',
+    'sweet_drink_frequency','snack_frequency','candy_frequency','candy_times_per_day','candy_pieces_per_time','add_sugar_frequency',
+    'smoking_status','smoking_years','smoking_months','cigarettes_per_day','quit_smoking_years','quit_smoking_months','other_tobacco_use','alcohol_status',
+    'oral_health_satisfaction','dental_check_12m','dental_treatment_12m','dental_treatment_places',
+    'oral_health_problem_12m','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','record_status'
+  ]);
+  const disease = ['disease_diabetes','disease_hypertension','disease_heart','disease_depression','disease_kidney','disease_arthritis','disease_stroke','disease_asthma','disease_cancer','disease_cancer_site','disease_other'];
+  const adultBase = base.concat(['marital_status','occupation','income_group','education_level'],disease);
+  const adultCare = oralCare.concat([
+    'toothbrush_bristle_type','toothbrush_change_frequency','additional_cleaning_methods',
+    'denture_cleaning_method','remove_denture_before_sleep',
+    'sweet_drink_frequency','sweet_level_order','add_sugar_frequency',
+    'smoking_status','smoking_years','smoking_months','cigarettes_per_day','quit_smoking_years','quit_smoking_months','other_tobacco_use','betel_chewing_status','alcohol_status',
+    'oral_health_satisfaction','oral_health_problem_12m','oral_health_problem_types','health_welfare_rights','oral_health_knowledge_sources_12m',
+    'dental_visit_12m','no_visit_reasons','dental_visit_times','visit_reasons','visit_places','used_health_right_last_visit','not_use_right_reasons','extra_payment_last_visit','extra_payment_amount'
+  ]);
+  if(age==='60_85') return adultBase.concat([
+    'oral_cleaning_no_teeth_method'
+  ], adultCare, [
+    'chewing_hard_food_problem','need_water_to_swallow','dry_tongue_palate','dry_mouth_feeling','coughing_choking_when_eating','record_status'
+  ]);
+  return adultBase.concat(adultCare,['record_status']);
 }
 function examFields(age){
   const base=['round_id','exam_date','examiner','duplication','age','sex','religion','education','location_type'];
@@ -209,8 +319,31 @@ function pageAssessment(){ const s=state.selectedStudent; return `<section class
 function assessmentForm(s){return `<div class="rounded-2xl bg-cyan-50 p-4 mb-4"><div class="font-bold text-cyan-900">${html(s.full_name)} (${html(s.age_group)})</div><div class="text-sm text-cyan-800">${html(s.identification_number)} | ${html([s.school_name||s.service_unit,s.district,s.subdistrict].filter(Boolean).join(' / '))}</div><button class="btn btn-gray mt-2" onclick="state.selectedStudent=null;render()">เปลี่ยนบุคคล</button></div><div class="flex flex-wrap gap-2 mb-4"><button class="tab" onclick="switchAssessType('INTERVIEW')" id="tabINTERVIEW">แบบสัมภาษณ์</button><button class="tab tab-active" onclick="switchAssessType('ORAL_EXAM')" id="tabORAL_EXAM">แบบตรวจช่องปาก</button></div><input type="hidden" id="assessType" value="ORAL_EXAM"><div id="assessmentBox"></div><script>setTimeout(()=>renderAssessmentInner('ORAL_EXAM'),10)<\/script>`;}
 function switchAssessType(t){document.getElementById('assessType').value=t; document.getElementById('tabINTERVIEW').className='tab '+(t==='INTERVIEW'?'tab-active':''); document.getElementById('tabORAL_EXAM').className='tab '+(t==='ORAL_EXAM'?'tab-active':''); renderAssessmentInner(t)}
 function draftKey(type,age,studentId){return `dental_draft_${studentId}_${type}_${age}`}
-function renderAssessmentInner(type){ const s=state.selectedStudent; const age=s.age_group||'12'; let fields= type==='INTERVIEW'?commonInterviewFields(age):examFields(age); if(type==='ORAL_EXAM'){ const embedded = new Set(['dental_fluorosis','occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear','capacity_status','oral_dryness_sign','prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left',...GINGIVAL_TEETH.map(t=>'gingival_'+t),...POCKET_SITES.map(t=>'pocket_'+t)]); fields = fields.filter(f=>!embedded.has(f)); } const key=draftKey(type,age,s.student_id); const draft=JSON.parse(localStorage.getItem(key)||'null'); let data=Object.assign({round_id:'ROUND-2569-01',record_status:'SUBMITTED',interview_date:today(),exam_date:today(),interviewer:state.user.full_name,examiner:state.user.full_name,age:s.age_year,sex:s.sex,religion:s.religion,education:s.education_level,location_type:s.location_type}, draft||{}); if(draft) setTimeout(()=>Swal.fire({icon:'question',title:'พบแบบร่างที่ยังไม่ได้ส่ง',text:'ต้องการกู้คืนหรือไม่',showCancelButton:true,confirmButtonText:'กู้คืน',cancelButtonText:'ลบทิ้ง'}).then(x=>{if(!x.isConfirmed){localStorage.removeItem(key); renderAssessmentInner(type)}}),80); document.getElementById('assessmentBox').innerHTML = `<form id="assessmentForm" oninput="saveDraft('${type}','${age}')"><div class="grid md:grid-cols-3 gap-3">${fields.map(f=>`<div class="${['additional_cleaning_methods','dental_treatment_places','oral_health_info_sources','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','oral_health_knowledge_sources_12m','no_visit_reasons','visit_reasons','visit_places','not_use_right_reasons','other_conditions'].includes(f)?'md:col-span-3':''}"><label class="label">${fieldLabels[f]||f}</label>${longField(f)?`<textarea class="input" name="${f}" rows="2">${html(data[f]||'')}</textarea>`:formInput(f,data[f]||'')}</div>`).join('')}</div>${type==='ORAL_EXAM'?toothChart(age,data):''}<div class="flex flex-wrap gap-2 mt-5 no-print"><button type="button" class="btn btn-primary" onclick="saveAssessment('${type}','${age}')">บันทึกข้อมูล</button><button type="button" class="btn btn-gray" onclick="clearDraft('${type}','${age}')">ลบแบบร่าง</button><button type="button" class="btn btn-soft" onclick="window.print()">พิมพ์หน้านี้</button></div></form>`; }
-function longField(f){return ['additional_cleaning_methods','dental_treatment_places','oral_health_info_sources','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','oral_health_knowledge_sources_12m','no_visit_reasons','visit_reasons','visit_places','not_use_right_reasons','other_conditions'].includes(f)}
+function renderAssessmentInner(type){ const s=state.selectedStudent; const age=s.age_group||'12'; let fields= type==='INTERVIEW'?commonInterviewFields(age):examFields(age); if(type==='ORAL_EXAM'){ const embedded = new Set(['dental_fluorosis','occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear','capacity_status','oral_dryness_sign','prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left',...GINGIVAL_TEETH.map(t=>'gingival_'+t),...POCKET_SITES.map(t=>'pocket_'+t)]); fields = fields.filter(f=>!embedded.has(f)); } const key=draftKey(type,age,s.student_id); const draft=JSON.parse(localStorage.getItem(key)||'null'); let data=Object.assign({round_id:'ROUND-2569-01',record_status:'SUBMITTED',interview_date:today(),exam_date:today(),interviewer:state.user.full_name,examiner:state.user.full_name,age:s.age_year,sex:s.sex,religion:s.religion,education:s.education_level,location_type:s.location_type}, draft||{}); if(draft) setTimeout(()=>Swal.fire({icon:'question',title:'พบแบบร่างที่ยังไม่ได้ส่ง',text:'ต้องการกู้คืนหรือไม่',showCancelButton:true,confirmButtonText:'กู้คืน',cancelButtonText:'ลบทิ้ง'}).then(x=>{if(!x.isConfirmed){localStorage.removeItem(key); renderAssessmentInner(type)}}),80); document.getElementById('assessmentBox').innerHTML = `<form id="assessmentForm" oninput="saveDraft('${type}','${age}')"><div class="grid md:grid-cols-3 gap-3">${fields.map(f=>`<div class="${colSpanField(f)}"><label class="label">${fieldLabels[f]||f}</label>${fieldControl(f,data[f]||'')}</div>`).join('')}</div>${type==='ORAL_EXAM'?toothChart(age,data):''}<div class="flex flex-wrap gap-2 mt-5 no-print"><button type="button" class="btn btn-primary" onclick="saveAssessment('${type}','${age}')">บันทึกข้อมูล</button><button type="button" class="btn btn-gray" onclick="clearDraft('${type}','${age}')">ลบแบบร่าง</button><button type="button" class="btn btn-soft" onclick="window.print()">พิมพ์หน้านี้</button></div></form>`; }
+function colSpanField(f){return ['additional_cleaning_methods','dental_treatment_places','oral_health_info_sources','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','oral_health_knowledge_sources_12m','no_visit_reasons','visit_reasons','visit_places','not_use_right_reasons','other_conditions'].includes(f)?'md:col-span-3':''}
+function longField(f){return ['other_conditions'].includes(f)}
+function fieldControl(f,value=''){
+  if(multiFieldOptions && multiFieldOptions[f]) return multiChoiceInput(f,value,multiFieldOptions[f]);
+  if(longField(f)) return `<textarea class="input" name="${f}" rows="2">${html(value||'')}</textarea>`;
+  return formInput(f,value||'');
+}
+function multiChoiceInput(name,value='',opts=[]){
+  const selected = String(value||'').split('|').map(x=>x.trim()).filter(Boolean);
+  const safe = name.replace(/[^a-zA-Z0-9_]/g,'_');
+  return `<div class="rounded-2xl border border-purple-100 bg-purple-50/40 p-3">
+    <input type="hidden" name="${name}" id="hidden_${safe}" value="${html(selected.join('|'))}">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">${opts.map((o,i)=>`<label class="flex items-start gap-2 rounded-xl bg-white border border-purple-100 p-2 text-sm"><input type="checkbox" class="mt-1 multi_${safe}" value="${html(o)}" ${selected.includes(o)?'checked':''} onchange="syncMulti('${safe}','${name}')"><span>${html(o)}</span></label>`).join('')}</div>
+    <input class="input mt-2" placeholder="อื่นๆ/ระบุเพิ่มเติม (ถ้ามี)" value="${html(selected.find(x=>!opts.includes(x))||'')}" oninput="syncMulti('${safe}','${name}',this.value)">
+  </div>`;
+}
+function syncMulti(safe,name,extra){
+  const checked=[...document.querySelectorAll('.multi_'+safe+':checked')].map(x=>x.value);
+  const extraInput=[...document.querySelectorAll(`input[oninput*="syncMulti('${safe}'"]`)][0];
+  const ex = extra!==undefined ? extra : (extraInput ? extraInput.value.trim() : '');
+  const vals = ex ? checked.concat([ex]) : checked;
+  const hid=document.getElementById('hidden_'+safe); if(hid) hid.value=vals.join('|');
+  const form=document.getElementById('assessmentForm'); if(form) saveDraft((document.querySelector('.tab-active')?.textContent||'').includes('สัมภาษณ์')?'INTERVIEW':'ORAL_EXAM', state.selectedStudent?.age_group||'12');
+}
 function codeSelectCell(name,value='',opts=[]){
   const fallback = opts.length?opts:['0','1','2','3','4','5','6','7','8','9','P','F','R','T','K','A','B','C','D','E','G','H','N'];
   return `<select class="input text-center p-1" name="${name}"><option value=""></option>${fallback.map(o=>`<option ${String(value)===String(o)?'selected':''} value="${html(o)}">${html(o)}</option>`).join('')}</select>`;
