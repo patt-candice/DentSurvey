@@ -184,7 +184,33 @@ const multiFieldOptions = {
 };
 
 
+function normalizeAgeGroup(age){
+  const raw = String(age ?? '').trim();
+  if(!raw) return '12';
+  const s = raw.replace(/ปี/g,'').replace(/_/g,'-').replace(/\s+/g,'').toLowerCase();
+  if(/^12$/.test(s) || /^12\D/.test(s)) return '12';
+  if(/^15$/.test(s) || /^15\D/.test(s)) return '15';
+  if(s.includes('35-44') || s.includes('35to44') || s==='35' || s==='44') return '35_44';
+  if(s.includes('60-85') || s.includes('60-74') || s.includes('80-85') || s.includes('60to85') || s==='60' || s==='74' || s==='80' || s==='85') return '60_85';
+  const n = parseInt(s,10);
+  if(!isNaN(n)){
+    if(n === 12) return '12';
+    if(n === 15) return '15';
+    if(n >= 35 && n <= 44) return '35_44';
+    if(n >= 60 && n <= 85) return '60_85';
+  }
+  return raw.replace('-', '_');
+}
+function ageGroupLabel(age){ const a=normalizeAgeGroup(age); return (AGE_GROUPS.find(x=>x.id===a)||{}).label || a; }
+function setAssessmentAgeGroup(age){
+  if(!state.selectedStudent) return;
+  state.selectedStudent.age_group = normalizeAgeGroup(age);
+  renderAssessmentInner((document.getElementById('assessType')||{}).value || 'ORAL_EXAM');
+}
+
+
 function commonInterviewFields(age){
+  age = normalizeAgeGroup(age);
   // Interview form fields are intentionally separated by age group to match the paper forms.
   // 12 and 15 years DO NOT include chronic disease questions.
   const base = ['round_id','interview_date','interviewer','weight','height','weight_height_source','religion'];
@@ -244,6 +270,7 @@ function commonInterviewFields(age){
   ], adultService, ['record_status']);
 }
 function examFields(age){
+  age = normalizeAgeGroup(age);
   const base=['round_id','exam_date','examiner','duplication','age','sex','religion','education','location_type'];
   if(age==='12') return base.concat(['dental_fluorosis'], GINGIVAL_TEETH.map(t=>'gingival_'+t), ['other_conditions','record_status']);
   if(age==='15') return base.concat(GINGIVAL_TEETH.map(t=>'gingival_'+t), ['other_conditions','record_status']);
@@ -259,6 +286,7 @@ const sectionTitles={
   basic:'ส่วนที่ 1 ข้อมูลทั่วไป', oralcare:'ส่วนที่ 2.1 พฤติกรรมการดูแลช่องปาก/แปรงฟัน', consume:'ส่วนที่ 2.2 พฤติกรรมการบริโภคขนมและเครื่องดื่ม', risk:'ส่วนที่ 2.3 พฤติกรรมอื่น ๆ ที่เกี่ยวข้อง', service:'ส่วนที่ 3 การรับรู้ การรับบริการ และคุณภาพชีวิต', disease:'โรคประจำตัวที่ได้รับการวินิจฉัยโดยแพทย์', denture:'ฟันเทียมและการทำความสะอาด', elderly:'ปัญหาการเคี้ยว กลืน และภาวะปากแห้ง', audit:'สถานะข้อมูล'
 };
 function groupInterviewFields(age, fields){
+  age = normalizeAgeGroup(age);
   const disease = ['disease_diabetes','disease_hypertension','disease_heart','disease_depression','disease_kidney','disease_arthritis','disease_stroke','disease_asthma','disease_cancer','disease_cancer_site','disease_other'];
   const groups={basic:[],disease:[],oralcare:[],denture:[],consume:[],risk:[],elderly:[],service:[],audit:[]};
   const basicSet=new Set(['round_id','interview_date','interviewer','weight','height','weight_height_source','religion','marital_status','occupation','income_group','education_level']);
@@ -280,7 +308,7 @@ const kpiIcons={kpiStudents:'👥',kpiInterview:'📝',kpiExam:'🦷',kpiTreatme
 function formatReportValue(k,v){ if(!v) return ''; if(/date|_at/.test(k)) return thaiDate(v); return String(v).replace(/\|/g, ', '); }
 function reportFieldGrid(fields,rec){return fields.filter(f=>rec[f]!==''&&rec[f]!=null).map(f=>`<div class="border-b border-slate-200 py-1"><b>${fieldLabels[f]||f}:</b> ${html(formatReportValue(f,rec[f]))}</div>`).join('')}
 function renderPaperReport(rp){
-  const rec=rp.record||{}, stu=rp.student||{}, age=rp.age_group||stu.age_group||'12';
+  const rec=rp.record||{}, stu=rp.student||{}, age=normalizeAgeGroup(rp.age_group||stu.age_group||stu.age_year||'12');
   const isInterview=rp.type==='INTERVIEW';
   const title=isInterview?'แบบสัมภาษณ์':'แบบสำรวจสุขภาพช่องปาก';
   const dateVal=rec.interview_date||rec.exam_date||rec.created_at;
@@ -401,13 +429,13 @@ function formInput(name,value=''){
   return `<input class="input" name="${name}" type="${type}" value="${html(value)}">`;
 }
 function openStudentForm(row={}){Swal.fire({title: row.student_id?'แก้ไขข้อมูลบุคคล':'เพิ่มบุคคลใหม่',width:'900px',html:`<form id="studentForm" class="grid md:grid-cols-3 gap-3 text-left">${studentFields().map(f=>`<div><label class="label">${fieldLabels[f]||f}</label>${formInput(f,row[f]||'')}</div>`).join('')}</form>`,showCancelButton:true,confirmButtonText:'บันทึก',cancelButtonText:'ยกเลิก',preConfirm:()=>Object.fromEntries(new FormData(document.getElementById('studentForm')))}).then(async res=>{if(res.isConfirmed){try{const data=Object.assign({},row,res.value); showLoading('กำลังบันทึก'); const r=await api('saveStudent',{data:JSON.stringify(data)}); Swal.close(); if(r.duplicates&&r.duplicates.length) await Swal.fire('บันทึกแล้ว แต่พบข้อมูลคล้ายกัน',`พบ ${r.duplicates.length} รายการ ระบบอนุญาตให้บันทึกตามที่ยืนยัน`, 'warning'); else toast('success','บันทึกสำเร็จ'); searchStudents();}catch(e){Swal.fire('บันทึกไม่สำเร็จ',e.message,'error')}}})}
-async function selectStudent(row){state.selectedStudent=row; try{showLoading('กำลังเลือกบุคคลและตรวจสอบประวัติ'); const r=await api('getStudentHistory',{student_id:row.student_id}); Swal.close(); state.history=r.history||[]; if(state.history.length){await Swal.fire({icon:'warning',title:'พบประวัติการประเมินของบุคคลนี้แล้ว',html:`<div class="text-left text-sm">${state.history.slice(0,8).map(h=>`<div class="p-2 rounded-lg bg-amber-50 mb-1">${h.type} ${h.age_group} วันที่ ${thaiDate(h.date)||'-'} สถานะ ${h.record_status||'-'} โดย ${h.created_by||'-'}</div>`).join('')}<p class="mt-2 text-slate-600">ยังสามารถบันทึกผลประเมินใหม่ได้ หากเป็นการประเมินซ้ำหรือคนละรอบการสำรวจ</p></div>`,confirmButtonText:'บันทึกใหม่ต่อ'});} setPage('assessment');}catch(e){Swal.close(); Swal.fire('ผิดพลาด',e.message,'error')}};
+async function selectStudent(row){row.age_group=normalizeAgeGroup(row.age_group || row.age_year); state.selectedStudent=row; try{showLoading('กำลังเลือกบุคคลและตรวจสอบประวัติ'); const r=await api('getStudentHistory',{student_id:row.student_id}); Swal.close(); state.history=r.history||[]; if(state.history.length){await Swal.fire({icon:'warning',title:'พบประวัติการประเมินของบุคคลนี้แล้ว',html:`<div class="text-left text-sm">${state.history.slice(0,8).map(h=>`<div class="p-2 rounded-lg bg-amber-50 mb-1">${h.type} ${h.age_group} วันที่ ${thaiDate(h.date)||'-'} สถานะ ${h.record_status||'-'} โดย ${h.created_by||'-'}</div>`).join('')}<p class="mt-2 text-slate-600">ยังสามารถบันทึกผลประเมินใหม่ได้ หากเป็นการประเมินซ้ำหรือคนละรอบการสำรวจ</p></div>`,confirmButtonText:'บันทึกใหม่ต่อ'});} setPage('assessment');}catch(e){Swal.close(); Swal.fire('ผิดพลาด',e.message,'error')}};
 
 function pageAssessment(){ const s=state.selectedStudent; return `<section class="card p-5"><h2 class="text-xl font-bold text-cyan-800 mb-3">เพิ่มข้อมูลประเมิน</h2>${!s?`<div class="rounded-2xl bg-amber-50 p-5 text-amber-800 mb-4"><b>ต้องเลือกบุคคลก่อนประเมินเสมอ</b><p>ค้นหาและเลือกบุคคลจากหน้านี้ได้เลย หรือเพิ่มบุคคลใหม่ก่อนเริ่มประเมิน</p></div><div class="grid md:grid-cols-4 gap-3 mb-4"><div class="md:col-span-2"><label class="label">ค้นหา ชื่อ / Identification / โรงเรียน / พื้นที่</label><input id="studentQ" class="input" placeholder="พิมพ์คำค้น"></div><div><label class="label">กลุ่มวัย</label><select id="studentAge" class="input"><option value="">ทั้งหมด</option>${AGE_GROUPS.map(a=>`<option value="${a.id}">${a.label}</option>`).join('')}</select></div><div class="flex items-end gap-2"><button onclick="searchStudents()" class="btn btn-primary">ค้นหา</button><button onclick="openStudentForm()" class="btn btn-soft">+ เพิ่มบุคคล</button></div></div><div id="studentResults" class="table-wrap"></div>`:assessmentForm(s)}</section>`;}
-function assessmentForm(s){return `<div class="rounded-2xl bg-cyan-50 p-4 mb-4"><div class="font-bold text-cyan-900">${html(s.full_name)} (${html(s.age_group)})</div><div class="text-sm text-cyan-800">${html(s.identification_number)} | ${html([s.school_name||s.service_unit,s.district,s.subdistrict].filter(Boolean).join(' / '))}</div><button class="btn btn-gray mt-2" onclick="state.selectedStudent=null;render()">เปลี่ยนบุคคล</button></div><div class="flex flex-wrap gap-2 mb-4"><button class="tab" onclick="switchAssessType('INTERVIEW')" id="tabINTERVIEW">แบบสัมภาษณ์</button><button class="tab tab-active" onclick="switchAssessType('ORAL_EXAM')" id="tabORAL_EXAM">แบบตรวจช่องปาก</button></div><input type="hidden" id="assessType" value="ORAL_EXAM"><div id="assessmentBox"></div><script>setTimeout(()=>renderAssessmentInner('ORAL_EXAM'),10)<\/script>`;}
+function assessmentForm(s){const ag=normalizeAgeGroup(s.age_group||s.age_year); s.age_group=ag; return `<div class="rounded-2xl bg-cyan-50 p-4 mb-4"><div class="font-bold text-cyan-900">${html(s.full_name)} (${html(ageGroupLabel(ag))})</div><div class="text-sm text-cyan-800">${html(s.identification_number)} | ${html([s.school_name||s.service_unit,s.district,s.subdistrict].filter(Boolean).join(' / '))}</div><div class="mt-3 max-w-xs no-print"><label class="label">กลุ่มวัยของแบบประเมิน</label><select class="input" onchange="setAssessmentAgeGroup(this.value)">${AGE_GROUPS.map(a=>`<option value="${a.id}" ${a.id===ag?'selected':''}>${a.label}</option>`).join('')}</select><div class="text-xs text-purple-700 mt-1">ระบบจะแสดงคำถามตามแบบกระดาษของกลุ่มวัยนี้เท่านั้น</div></div><button class="btn btn-gray mt-2" onclick="state.selectedStudent=null;render()">เปลี่ยนบุคคล</button></div><div class="flex flex-wrap gap-2 mb-4"><button class="tab" onclick="switchAssessType('INTERVIEW')" id="tabINTERVIEW">แบบสัมภาษณ์</button><button class="tab tab-active" onclick="switchAssessType('ORAL_EXAM')" id="tabORAL_EXAM">แบบตรวจช่องปาก</button></div><input type="hidden" id="assessType" value="ORAL_EXAM"><div id="assessmentBox"></div><script>setTimeout(()=>renderAssessmentInner('ORAL_EXAM'),10)<\/script>`;}
 function switchAssessType(t){document.getElementById('assessType').value=t; document.getElementById('tabINTERVIEW').className='tab '+(t==='INTERVIEW'?'tab-active':''); document.getElementById('tabORAL_EXAM').className='tab '+(t==='ORAL_EXAM'?'tab-active':''); renderAssessmentInner(t)}
 function draftKey(type,age,studentId){return `dental_draft_${studentId}_${type}_${age}`}
-function renderAssessmentInner(type){ const s=state.selectedStudent; const age=s.age_group||'12'; let fields= type==='INTERVIEW'?commonInterviewFields(age):examFields(age); if(type==='ORAL_EXAM'){ const embedded = new Set(['dental_fluorosis','occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear','capacity_status','oral_dryness_sign','prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left',...GINGIVAL_TEETH.map(t=>'gingival_'+t),...POCKET_SITES.map(t=>'pocket_'+t)]); fields = fields.filter(f=>!embedded.has(f)); } const key=draftKey(type,age,s.student_id); const draft=JSON.parse(localStorage.getItem(key)||'null'); let data=Object.assign({round_id:'ROUND-2569-01',record_status:'SUBMITTED',interview_date:today(),exam_date:today(),interviewer:state.user.full_name,examiner:state.user.full_name,age:s.age_year,sex:s.sex,religion:s.religion,education:s.education_level,location_type:s.location_type}, draft||{}); if(draft) setTimeout(()=>Swal.fire({icon:'question',title:'พบแบบร่างที่ยังไม่ได้ส่ง',text:'ต้องการกู้คืนหรือไม่',showCancelButton:true,confirmButtonText:'กู้คืน',cancelButtonText:'ลบทิ้ง'}).then(x=>{if(!x.isConfirmed){localStorage.removeItem(key); renderAssessmentInner(type)}}),80); document.getElementById('assessmentBox').innerHTML = `<form id="assessmentForm" oninput="saveDraft('${type}','${age}')">${renderFormSections(type,age,fields,data)}${type==='ORAL_EXAM'?toothChart(age,data):''}<div class="flex flex-wrap gap-2 mt-5 no-print"><button type="button" class="btn btn-primary" onclick="saveAssessment('${type}','${age}')">บันทึกข้อมูล</button><button type="button" class="btn btn-gray" onclick="clearDraft('${type}','${age}')">ลบแบบร่าง</button><button type="button" class="btn btn-soft" onclick="window.print()">พิมพ์หน้านี้</button></div></form>`; }
+function renderAssessmentInner(type){ const s=state.selectedStudent; const age=normalizeAgeGroup(s.age_group || s.age_year || '12'); s.age_group=age; let fields= type==='INTERVIEW'?commonInterviewFields(age):examFields(age); if(type==='ORAL_EXAM'){ const embedded = new Set(['dental_fluorosis','occlusal_tooth_wear','incisal_tooth_wear','cervical_tooth_wear','capacity_status','oral_dryness_sign','prosthetic_status_upper','prosthetic_status_lower','prosthetic_need_upper','prosthetic_need_lower','posterior_occlusal_pair_right','posterior_occlusal_pair_left',...GINGIVAL_TEETH.map(t=>'gingival_'+t),...POCKET_SITES.map(t=>'pocket_'+t)]); fields = fields.filter(f=>!embedded.has(f)); } const key=draftKey(type,age,s.student_id); const draft=JSON.parse(localStorage.getItem(key)||'null'); let data=Object.assign({round_id:'ROUND-2569-01',record_status:'SUBMITTED',interview_date:today(),exam_date:today(),interviewer:state.user.full_name,examiner:state.user.full_name,age:s.age_year,sex:s.sex,religion:s.religion,education:s.education_level,location_type:s.location_type}, draft||{}); if(draft) setTimeout(()=>Swal.fire({icon:'question',title:'พบแบบร่างที่ยังไม่ได้ส่ง',text:'ต้องการกู้คืนหรือไม่',showCancelButton:true,confirmButtonText:'กู้คืน',cancelButtonText:'ลบทิ้ง'}).then(x=>{if(!x.isConfirmed){localStorage.removeItem(key); renderAssessmentInner(type)}}),80); document.getElementById('assessmentBox').innerHTML = `<div class="mb-3 rounded-2xl bg-purple-50 border border-purple-100 p-3 text-sm text-purple-800"><b>${type==='INTERVIEW'?'แบบสัมภาษณ์':'แบบตรวจช่องปาก'} กลุ่มวัย ${ageGroupLabel(age)}</b> — แสดงคำถามเฉพาะกลุ่มวัยนี้ (${fields.length} ช่องหลัก)</div><form id="assessmentForm" oninput="saveDraft('${type}','${age}')">${renderFormSections(type,age,fields,data)}${type==='ORAL_EXAM'?toothChart(age,data):''}<div class="flex flex-wrap gap-2 mt-5 no-print"><button type="button" class="btn btn-primary" onclick="saveAssessment('${type}','${age}')">บันทึกข้อมูล</button><button type="button" class="btn btn-gray" onclick="clearDraft('${type}','${age}')">ลบแบบร่าง</button><button type="button" class="btn btn-soft" onclick="window.print()">พิมพ์หน้านี้</button></div></form>`; }
 function colSpanField(f){return ['additional_cleaning_methods','dental_treatment_places','oral_health_info_sources','oral_health_problem_types','health_welfare_rights','knowledge_need_sources','knowledge_need_topics','oral_health_knowledge_sources_12m','no_visit_reasons','visit_reasons','visit_places','not_use_right_reasons','other_conditions'].includes(f)?'md:col-span-3':''}
 function longField(f){return ['other_conditions'].includes(f)}
 function fieldControl(f,value=''){
@@ -444,6 +472,7 @@ function scoreBox(title,names,labels,data,optionKeyPrefix){
   return `<div class="border rounded-2xl p-3 bg-white"><h4 class="font-bold text-purple-800 mb-2">${title}</h4><div class="grid grid-cols-3 gap-2">${names.map((n,i)=>`<div><label class="label text-center">${labels[i]}</label>${formInput(optionKeyPrefix+n,data[optionKeyPrefix+n]||'')}</div>`).join('')}</div></div>`;
 }
 function toothChart(age,data={}){
+  age = normalizeAgeGroup(age);
   const adult=['35_44','60_85'].includes(age);
   const upper= age==='12'?['55','54','53','52','51','61','62','63','64','65','18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28']:['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28'];
   const lower= age==='12'?['85','84','83','82','81','71','72','73','74','75','48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38']:['48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'];
